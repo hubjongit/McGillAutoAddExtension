@@ -1,0 +1,16 @@
+body {
+    min-width:400px;
+}
+
+label {
+    font-size: 14pt;
+}
+
+input {
+    font-size: 14pt;
+}
+
+#error {
+    color: red;
+    font-size: 10pt;
+}

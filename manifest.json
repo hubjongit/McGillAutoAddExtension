@@ -1,0 +1,32 @@
+{
+  "name": "McGill Course Auto Quick Add Extension",
+  "description": "Tool to automate the process of adding a course that is full or blocked. Input the CRN of the desired course and the extension will handle the rest!",
+  "version": "1.0",
+  "manifest_version": 3,
+  "permissions": [
+    "storage",
+    "tabs",
+    "activeTab"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "McGill Auto Add Extension Manager"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://horizon.mcgill.ca/pban1/bwskfreg.P_AltPin",
+        "https://horizon.mcgill.ca/pban1/bwckcoms.P_Regs"
+      ],
+      "js": [
+        "jquery-3.6.0.min.js",
+        "autoadd.js"
+      ],
+      "run_at": "document_end"
+    }
+  ]
+}
+
