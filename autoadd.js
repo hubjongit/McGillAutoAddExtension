@@ -1,115 +1,78 @@
-/*var port;
+const DELAY = 30000 // in ms
+const MAX_ATTEMPTS = 600
+var tryTimer;
 
-// Attempt to reconnect
-var reconnectToExtension = function () {
-    // Reset port
-    port = null;
-    // Attempt to reconnect after 1 second
-    setTimeout(connectToExtension, 1000 * 1);
-};
-
-// Attempt to connect
-var connectToExtension = function () {
-
-    // Make the connection
-    port = chrome.runtime.connect({name: "my-port"});
-
-    // When extension is upgraded or disabled and renabled, the content scripts
-    // will still be injected, so we have to reconnect them.
-    // We listen for an onDisconnect event, and then wait for a second before
-    // trying to connect again. Becuase chrome.runtime.connect fires an onDisconnect
-    // event if it does not connect, an unsuccessful connection should trigger
-    // another attempt, 1 second later.
-    port.onDisconnect.addListener(reconnectToExtension);
-
-};
-
-// Connect for the first time
-connectToExtension();*/
-
-
-console.log("autoadd injected")
-
-chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
-    if (request.ready === 'getStatus') {
-        console.log("Injection status requested by popup via message, responding true...")
-        sendResponse({
-            response: true
-        });
+chrome.storage.local.get(['state', 'crn'], function (keys) {
+    if (keys.state === 1) {
+        tryToAdd(keys.crn)
     }
 });
 
-function tryToAdd(crn, found) {
+function tryToAdd(crn) {
+    var found;
 
-    // setTimeout(function () {
-    var rows = $("table[class='datadisplaytable'][summary='Current Schedule']").find("tbody>tr");
-    $.each(rows, function (key, value) {
-        if ($(this).find("td:nth-child(3)").text() === crn) {
-            console.log("FOUND! congrats ;)")
-            alert("FOUND! congrats ;)")
+    var table = document.getElementsByClassName('datadisplaytable')[0];
+    for (var i = 1, row; row = table.rows[i]; i++) {
+        if (parseInt(row.cells[2].innerText) === crn) {
+            // course has been successfully added
             found = true
-            chrome.storage.local.set({'found': found});
+            chrome.storage.local.set({'state': 0, 'crn': ''});
+            alert("MCGILL COURSE AUTO QUICK ADD EXTENSION MANAGER\n\nCourse added! Enjoy the semester ;)")
+            return false;
         }
-    });
+    }
 
+    // course could not be added during this attempt
     if (!found) {
-        console.log("didn't work out this time");
-
-        setTimeout(function () {
-            $("#crn_id1").val(crn);
-            $("input[value='Submit Changes'][name='REG_BTN']").click();
+        tryTimer = setTimeout(function () {
+            chrome.storage.local.get(['attempts'], function (keys) {
+                // Extension will safely not exceed the maximum allowable attempts by Minerva that would lock user out
+                if (keys.attempts < MAX_ATTEMPTS) {
+                    chrome.storage.local.set({'attempts': parseInt(keys.attempts) + 1});
+                } else {
+                    // In the case that it will exceed, script is stopped and extension is reset
+                    chrome.storage.local.set({'state': 0, 'crn': ''});
+                    alert("MCGILL COURSE AUTO QUICK ADD EXTENSION MANAGER\n\nMax allowable attempts reached! Running this script beyond this point puts your Minerva account at risk of being flagged for too many requests which will require contacting a Service Point to resolve. Proceed at your own risk.\n\n(hint: reinstall to reset counter)")
+                    return false;
+                }
+            });
+            document.getElementById('crn_id1').value = crn
+            Array.from(document.getElementsByName('REG_BTN')).find(element => element.value === 'Submit Changes').click()
         }, DELAY);
     }
-
-    // }, 500);
 }
 
-function check() {
-    chrome.storage.local.get(['state', 'crn', 'found'], function (items) {
-        if (!items.found && items.state === 'Stop') {
-            // tryToAdd(items.crn, items.found);
-            console.log("\"tryToAdd()\"")
-        } else if (items.found) {
-            return;
-        }
-    });
-}
-
-
-const DELAY = 30000 // in ms
-
-chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
-    if (request.state !== undefined) {
-        console.log("State message received: " + request.state)
-        if (request.crn !== undefined) {
-            console.log("CRN message received: " + request.crn)
-            chrome.storage.local.set({
-                'state': request.state,
-                'crn': parseInt(request.crn),
-                'found': false
-            });
-            sendResponse({
-                type: 'running',
-                response: true
-            });
-            check();
-        } else {
-            chrome.storage.local.set({
-                'state': request.state,
-            });
-            sendResponse({
-                type: 'stopping',
-                response: true
-            });
-        }
-    } else {
+chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
+    if (message.ready === 'get') {
+        // Script injection status requested by popup via message, responding true...
         sendResponse({
-            type: 'invalid',
-            response: false
+            ready: true
         });
+        return true;
     }
+
+    chrome.storage.local.get(['state', 'crn'], function (keys) {
+        if (keys.state === message.newState) {
+            if (keys.state === 1) {
+                sendResponse({
+                    valid: true,
+                    type: 1
+                });
+                tryToAdd(keys.crn);
+                return true;
+            } else if (keys.state === 0) {
+                clearTimeout(tryTimer)
+                sendResponse({
+                    valid: true,
+                    type: 0
+                });
+                return true;
+            }
+        }
+        sendResponse({
+            valid: false,
+            type: -1
+        });
+    });
+    return true;
 });
-
-
-//TODO dont update CRN on stopping the run, and why is it not loading back up
-//TODO could maybe do 'ready' disabled through storage in background.js?

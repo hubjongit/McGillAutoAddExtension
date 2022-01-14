@@ -22,7 +22,6 @@
         "https://horizon.mcgill.ca/pban1/bwckcoms.P_Regs"
       ],
       "js": [
-        "jquery-3.6.0.min.js",
         "autoadd.js"
       ],
       "run_at": "document_end"
